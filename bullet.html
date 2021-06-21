@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>弹幕</title>
+</head>
+<style>
+    *{
+        margin:0;
+        padding:0;
+    }
+    body{
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+<body>
+<!--这里随便写个div，正儿八经应该是video标签，因为弹幕在视频上方 -->
+<div id="parent" style="width:70vw;height:70vh;">
+    <video width="100%" height="100%" id="video" muted autoplay controls loop style="background:#000;object-fit:fill">
+        <source src="./dog.mp4" type="video/mp4">
+    </video>
+</div>
+</body>
+<script>
+    
+//为实现弹幕遮盖video,只有在video父级加上dom
+let oparent=document.querySelector('#parent')
+let ovideo=document.querySelector('#video')
+var width=oparent.offsetWidth
+var height=oparent.offsetHeight
+
+//创建一个遮罩，上方放所有的弹幕信息
+const layer=document.createElement('div')
+
+oparent.style.position='relative'
+layer.style.left='0'
+layer.style.right='0'
+layer.style.top='0'
+layer.style.bottom='0'
+layer.style.width=width+'px'
+layer.style.height=height+'px'
+layer.style.zIndex='10000'
+layer.style.overflow='hidden'
+layer.style.background='transparent'
+layer.style.position='relative'
+
+let odiv=document.createElement('div')
+odiv.style.position='absolute'
+odiv.style.left='0'
+odiv.style.right='0'
+odiv.style.top='0'
+odiv.style.bottom='0'
+odiv.appendChild(layer)
+oparent.appendChild(odiv)
+
+//创建个集合，存放所有的弹幕信息对象，因为弹幕滚过去后就会清除，所以100个足够了
+let msg=[]
+for(let i=0;i<100;i++){
+    msg.push(null)
+}
+
+//创建弹幕信息对象
+function createDom(str,size,color,time){
+    let milSecond=time*1000/width  //根据屏幕宽度和一共所需时长计算弹幕的滚动速度
+    let str_dom=document.createElement('p')
+    str_dom.innerHTML=`${str}`
+    str_dom.style.lineHeight='1'
+    str_dom.style.fontSize=size
+    str_dom.style.width=width+'px'
+    str_dom.style.height=size
+    str_dom.style.margin=0
+    str_dom.style.position='absolute'
+    str_dom.style.left='0'
+    str_dom.style.top=`${getTop()}`
+    str_dom.style.transition=`all ${time}s linear`  //给弹幕添加动画，匀速滚动
+    str_dom.style.color=color
+
+    let current=msg.find(s=>!s)  //标记弹幕集合里第一个为空的对象，不为空的对象肯定还在滚动，为空的就执行下边重写
+    let currentIndex=msg.findIndex(s=>!s)+1
+    current={
+        dom:str_dom,
+        str:str,
+        color:color,
+        time:time
+    }
+    msg.splice(currentIndex,1,current) //重写弹幕对象后，把原来的那个空弹幕对象干掉，把当前传入的信息放进去
+    msg.forEach(s=>{
+        if(s){  //循环弹幕集合，弹幕信息为null的不管，不为null的需要进一步处理
+            layer.appendChild(s.dom)  //遮罩上加入弹幕对象的dom
+            setTimeout(()=>{
+                s.dom.style.left=width+'px'  //上边有个transition动画时间和速度，这里定义动画类型。注意：必须有setTimeout包起来（js的执行栈顺序）
+            })
+            setTimeout(()=>{  //前三行加入到遮罩时，就开始倒计时了，在滚出屏幕后要把弹幕信息对象还改为null，方便下一次存储，否则100个弹幕集合就完全不够了
+                layer.removeChild(s.dom)
+                msg.splice(currentIndex,1,null)
+            },time*1000)
+        }
+    })
+}
+
+function reconvert(str){  //将中文汉字的unicode码转为中文汉字
+    str = str.replace(/(\\u)(\w{1,4})/gi, function ($0){ 
+        return (String.fromCharCode(parseInt((escape($0).replace(/(%5Cu)(\w{1,4})/g, "$2" )),16))); 
+    }); 
+    str = str.replace(/(& #x)(\w{1,4});/gi,function($0){ 
+        return String.fromCharCode(parseInt(escape($0).replace(/(%26%23x)(\w{1,4})(%3B)/g, "$2" ),16)); 
+    }); 
+    str = str.replace(/(& #)(\d{1,6});/gi,function($0){ 
+        return String.fromCharCode(parseInt(escape($0).replace(/(%26%23)(\d{1,6})(%3B)/g, "$2" ))); 
+    }); 
+    return str; 
+}
+function getRandomChineseWord () {  //随机生成中文汉字的unicode码
+    return reconvert(`\\u${(Math.round(Math.random() * 20901) + 19968).toString(16)}`)
+}
+
+function getFontSize(){  //生成15px-24px的弹幕字体
+    return parseInt(Math.random()*10+15)+'px'
+}
+
+function getTop(){  //弹幕距离屏幕上方的top值
+    return parseInt(Math.random()*height)+'px'
+}
+
+function getScrollSecond(){  //弹幕滚动时间范围，随机生成12-21秒
+    return parseInt(Math.random()*10+12)
+}
+
+function randomHexColor() { //随机生成十六进制颜色
+    var hex = Math.floor(Math.random() * 16777216).toString(16); //生成ffffff以内16进制数
+    while (hex.length < 6) { //while循环判断hex位数，少于6位前面加0凑够6位
+    hex = '0' + hex;
+    }
+    return '#' + hex; //返回‘#'开头16进制颜色
+}
+
+function getLength(){  //随机生成弹幕的长度范围，1-20个
+    return parseInt((Math.random()*10+1)*2-1)
+}
+
+function sendBullet(second,length){  //发送弹幕
+    let str=''
+    for(let i=0;i<length;i++){
+        str=str+getRandomChineseWord()   //将汉字拼接成弹幕
+    }
+    createDom(str,getFontSize(),randomHexColor(),getScrollSecond())  //在遮罩上生成弹幕，传入弹幕文字、弹幕字体大小、弹幕字体的颜色、弹幕的滚动时间
+    setTimeout(()=>{
+        sendBullet(second,getLength())  //这里函数调用函数本身，持续发弹幕
+    },second)
+}
+sendBullet(500,getLength())  //每隔200毫秒发送一条弹幕
+
+
+</script>
+</html>
